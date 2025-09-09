@@ -1,0 +1,19 @@
+Zone Configuration Summary
+Video: groceryvideo.mp4
+Frame size: 1270x720
+Total zones: 2
+
+Zone 0:
+  Point 1: (1194, 485)
+  Point 2: (556, 149)
+  Point 3: (632, 11)
+  Point 4: (1260, 11)
+  Point 5: (1196, 486)
+
+Zone 1:
+  Point 1: (350, 207)
+  Point 2: (804, 561)
+  Point 3: (605, 716)
+  Point 4: (188, 718)
+  Point 5: (23, 292)
+

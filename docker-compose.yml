@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  tracking-app:
+    build: .
+    container_name: thesis-tracking
+    volumes:
+      - ./data:/app/data
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY}
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Development service with hot reload
+  tracking-dev:
+    build: .
+    container_name: thesis-tracking-dev
+    volumes:
+      - ./tracking_test:/app/tracking_test
+      - ./supervision:/app/supervision
+      - ./data:/app/data
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY}
+      - PYTHONPATH=/app
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: bash
+
+volumes:
+  data:
+    driver: local
