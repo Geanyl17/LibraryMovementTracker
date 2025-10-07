@@ -11,10 +11,10 @@ class ActivityDetector:
     """Detects human activities based on pose and movement patterns"""
     
     def __init__(self):
-        # Activity classification thresholds
-        self.speed_threshold_walking = 0.5  # pixels per frame
-        self.speed_threshold_running = 2.0  # pixels per frame
-        self.standing_movement_threshold = 0.3
+        # Activity classification thresholds (calibrated for 1920x1080 @ 25fps)
+        self.standing_movement_threshold = 3.0  # pixels per frame - small movement while standing
+        self.speed_threshold_walking = 8.0      # pixels per frame - slow/normal walking
+        self.speed_threshold_running = 25.0     # pixels per frame - fast walking/running threshold
         self.pose_history_length = 10
         
         # Track pose history for each person

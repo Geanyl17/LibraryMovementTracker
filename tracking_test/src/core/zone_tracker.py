@@ -113,11 +113,24 @@ class ZoneTracker:
         if not self.analytics_data:
             print("No analytics data to export")
             return
-        
+
+        # Organize outputs into proper folders
+        from pathlib import Path
+        base_name = Path(output_path).stem
+        output_dir = Path(output_path).parent
+
+        # Create organized paths
+        csv_path = str(output_dir / 'analytics' / 'csv' / f'{base_name}.csv')
+        excel_path = str(output_dir / 'analytics' / 'excel' / f'{base_name}.xlsx')
+        json_path = str(output_dir / 'analytics' / 'json' / f'{base_name}.json')
+
+        # Ensure directories exist
+        Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(excel_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(json_path).parent.mkdir(parents=True, exist_ok=True)
+
         # Export detailed events log
         df = pd.DataFrame(self.analytics_data)
-        csv_path = output_path.replace('.json', '.csv')
-        excel_path = output_path.replace('.json', '.xlsx')
         
         # Export to CSV
         df.to_csv(csv_path, index=False)
@@ -167,7 +180,7 @@ class ZoneTracker:
         for zone_id in self.zone_entries.keys():
             summary['zones'][str(zone_id)] = self.get_zone_analytics(zone_id)
         
-        with open(output_path, 'w') as f:
+        with open(json_path, 'w') as f:
             json.dump(summary, f, indent=2)
-        
-        print(f"Analytics exported to {csv_path}, {excel_path}, and {output_path}")
+
+        print(f"Analytics exported to {csv_path}, {excel_path}, and {json_path}")

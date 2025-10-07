@@ -13,20 +13,27 @@ export default function ZoneSelector({ videoUrl, onZonesChange }) {
 
   useEffect(() => {
     if (onZonesChange) {
-      onZonesChange(zones);
+      onZonesChange(zones, videoSize);
     }
-  }, [zones, onZonesChange]);
+  }, [zones, videoSize, onZonesChange]);
 
   const handleVideoLoad = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
+
     if (video && canvas) {
       const rect = video.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.height;
-      setVideoSize({ width: rect.width, height: rect.height });
-      
+
+      // Store both display size and actual video dimensions
+      setVideoSize({
+        width: rect.width,
+        height: rect.height,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight
+      });
+
       // Redraw zones when video is loaded
       redrawZones();
     }

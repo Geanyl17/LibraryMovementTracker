@@ -6,6 +6,9 @@ import Statistics from './components/Statistics';
 import EnhancedStatistics from './components/EnhancedStatistics';
 import VideoUpload from './components/VideoUpload';
 import ZoneSelector from './components/ZoneSelector';
+import VideoProcessor from './components/VideoProcessor';
+import ProcessedVideoViewer from './components/ProcessedVideoViewer';
+import ZoneAnalytics from './components/ZoneAnalytics';
 import Charts from './components/Charts';
 import EnhancedCharts from './components/EnhancedCharts';
 
@@ -15,6 +18,8 @@ export default function Home() {
   const [videoFile, setVideoFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState('');
   const [zones, setZones] = useState([]);
+  const [videoSize, setVideoSize] = useState(null);
+  const [processingResult, setProcessingResult] = useState(null);
 
   const handleDataLoad = (data, fileName) => {
     setCsvData(data);
@@ -26,8 +31,41 @@ export default function Home() {
     setVideoUrl(url);
   };
 
-  const handleZonesChange = (newZones) => {
+  const handleZonesChange = (newZones, size) => {
     setZones(newZones);
+    if (size) {
+      setVideoSize(size);
+    }
+  };
+
+  const handleProcessingComplete = async (result) => {
+    console.log('Processing complete:', result);
+    setProcessingResult(result);
+
+    // Auto-load the CSV analytics
+    if (result.files && result.files.csvPath) {
+      try {
+        const response = await fetch(`/api/download?file=${result.files.csvPath}&timestamp=${result.timestamp}`);
+        const csvText = await response.text();
+
+        // Parse CSV
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',');
+        const data = lines.slice(1).filter(line => line.trim()).map(line => {
+          const values = line.split(',');
+          const row = {};
+          headers.forEach((header, i) => {
+            row[header.trim()] = values[i]?.trim() || '';
+          });
+          return row;
+        });
+
+        setCsvData(data);
+        setCsvFileName(result.files.csvPath.split('/').pop());
+      } catch (error) {
+        console.error('Failed to load CSV:', error);
+      }
+    }
   };
 
   return (
@@ -68,11 +106,37 @@ export default function Home() {
 
           {/* Zone Selection Section */}
           <section>
-            <ZoneSelector 
-              videoUrl={videoUrl} 
+            <ZoneSelector
+              videoUrl={videoUrl}
               onZonesChange={handleZonesChange}
             />
           </section>
+
+          {/* Video Processing Section */}
+          {videoFile && zones.length > 0 && (
+            <section>
+              <VideoProcessor
+                videoFile={videoFile}
+                zones={zones}
+                videoSize={videoSize}
+                onProcessingComplete={handleProcessingComplete}
+              />
+            </section>
+          )}
+
+          {/* Processed Video Viewer */}
+          {processingResult && (
+            <section>
+              <ProcessedVideoViewer result={processingResult} />
+            </section>
+          )}
+
+          {/* Zone Analytics - Show for zone tracking data */}
+          {csvData.length > 0 && csvFileName.includes('analytics') && (
+            <section>
+              <ZoneAnalytics csvData={csvData} fileName={csvFileName} />
+            </section>
+          )}
 
           {/* Enhanced Statistics Section */}
           {csvData.length > 0 && (

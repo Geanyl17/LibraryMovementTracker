@@ -27,10 +27,10 @@ class ZoneAnalyzer:
         self.model = YOLO(model_path)
         # Configure ByteTrack for better ID consistency
         self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.25,   # Lower threshold for activation
-            lost_track_buffer=60,              # Keep lost tracks longer (60 frames)
-            minimum_matching_threshold=0.3,    # Lower matching threshold
-            minimum_consecutive_frames=1       # Activate tracks faster
+            track_activation_threshold=0.4,    # Lower threshold to detect stationary people
+            lost_track_buffer=30,              # Keep lost tracks for 30 frames (~1 second at 25fps)
+            minimum_matching_threshold=0.6,    # Moderate matching threshold
+            minimum_consecutive_frames=1       # Assign ID immediately for stationary people
         )
         self.device = device
         self.confidence_threshold = confidence_threshold
@@ -78,12 +78,37 @@ class ZoneAnalyzer:
         # Video writer setup
         video_writer = None
         if output_path:
-            video_writer = cv2.VideoWriter(
-                output_path,
-                cv2.VideoWriter_fourcc(*'mp4v'),
-                video_info.fps,
-                (video_info.width, video_info.height)
-            )
+            # Use H.264 codec for better browser compatibility
+            # Try different codecs in order of preference
+            codecs = ['avc1', 'H264', 'X264', 'mp4v']
+            video_writer = None
+
+            for codec in codecs:
+                try:
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    writer = cv2.VideoWriter(
+                        output_path,
+                        fourcc,
+                        video_info.fps,
+                        (video_info.width, video_info.height)
+                    )
+                    if writer.isOpened():
+                        video_writer = writer
+                        print(f"Using codec: {codec}")
+                        break
+                    else:
+                        writer.release()
+                except:
+                    continue
+
+            if not video_writer:
+                print("Warning: Could not initialize video writer with preferred codec, using default")
+                video_writer = cv2.VideoWriter(
+                    output_path,
+                    cv2.VideoWriter_fourcc(*'mp4v'),
+                    video_info.fps,
+                    (video_info.width, video_info.height)
+                )
         
         cap = cv2.VideoCapture(video_path)
         
@@ -116,7 +141,10 @@ class ZoneAnalyzer:
             
             # Process each zone
             annotated_frame = frame.copy()
-            
+
+            # Track which person IDs are in zones (for coloring)
+            person_zone_mapping = {}  # person_id -> zone_idx
+
             for zone_idx, zone in enumerate(zones):
                 # Draw zone
                 annotated_frame = sv.draw_polygon(
@@ -124,60 +152,71 @@ class ZoneAnalyzer:
                     polygon=zone.polygon,
                     color=self.colors.by_idx(zone_idx)
                 )
-                
+
                 # Get detections in this zone
                 detections_in_zone = detections[zone.trigger(detections)]
                 person_ids_in_zone = set(detections_in_zone.tracker_id) if len(detections_in_zone) > 0 else set()
-                
+
                 # Update zone tracking
                 zone_tracker.update_zone_tracking(zone_idx, person_ids_in_zone)
-                
-                # Annotate people in zone
-                if len(detections_in_zone) > 0:
-                    # Draw bounding boxes for people in zone
-                    color = self.colors.by_idx(zone_idx).as_bgr()
-                    for xyxy in detections_in_zone.xyxy:
-                        cv2.rectangle(
-                            annotated_frame, 
-                            (int(xyxy[0]), int(xyxy[1])), 
-                            (int(xyxy[2]), int(xyxy[3])), 
-                            color, 
-                            2
-                        )
-                    
-                    # Add labels with person ID and time in zone
-                    for i, (xyxy, person_id) in enumerate(zip(detections_in_zone.xyxy, detections_in_zone.tracker_id)):
-                        # Calculate time in zone if person entered
+
+                # Map person IDs to zones
+                for person_id in person_ids_in_zone:
+                    person_zone_mapping[person_id] = zone_idx
+
+            # Draw ALL detections (both in zones and outside zones)
+            if len(detections) > 0:
+                for i, (xyxy, person_id) in enumerate(zip(detections.xyxy, detections.tracker_id)):
+                    # Determine color based on zone
+                    if person_id in person_zone_mapping:
+                        zone_idx = person_zone_mapping[person_id]
+                        color = self.colors.by_idx(zone_idx).as_bgr()
+
+                        # Calculate time in zone
                         time_in_zone = 0
-                        if (zone_idx in zone_tracker.zone_entries and 
+                        if (zone_idx in zone_tracker.zone_entries and
                             person_id in zone_tracker.zone_entries[zone_idx]):
                             entry_time = zone_tracker.zone_entries[zone_idx][person_id]
                             time_in_zone = (datetime.now() - entry_time).total_seconds()
-                        
+
                         label = f"#{person_id} {int(time_in_zone//60):02d}:{int(time_in_zone%60):02d}"
-                        
-                        # Draw label background
-                        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                        cv2.rectangle(
-                            annotated_frame,
-                            (int(xyxy[0]), int(xyxy[1]) - label_size[1] - 10),
-                            (int(xyxy[0]) + label_size[0] + 10, int(xyxy[1])),
-                            color,
-                            -1
-                        )
-                        
-                        # Draw label text
-                        cv2.putText(
-                            annotated_frame,
-                            label,
-                            (int(xyxy[0]) + 5, int(xyxy[1]) - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6,
-                            (255, 255, 255),
-                            2
-                        )
-                
-                # Add zone info text
+                    else:
+                        # Person outside zones - use gray
+                        color = (128, 128, 128)
+                        label = f"#{person_id}"
+
+                    # Draw bounding box
+                    cv2.rectangle(
+                        annotated_frame,
+                        (int(xyxy[0]), int(xyxy[1])),
+                        (int(xyxy[2]), int(xyxy[3])),
+                        color,
+                        2
+                    )
+
+                    # Draw label background
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                    cv2.rectangle(
+                        annotated_frame,
+                        (int(xyxy[0]), int(xyxy[1]) - label_size[1] - 10),
+                        (int(xyxy[0]) + label_size[0] + 10, int(xyxy[1])),
+                        color,
+                        -1
+                    )
+
+                    # Draw label text
+                    cv2.putText(
+                        annotated_frame,
+                        label,
+                        (int(xyxy[0]) + 5, int(xyxy[1]) - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (255, 255, 255),
+                        2
+                    )
+
+            # Add zone info text for each zone
+            for zone_idx in range(len(zones)):
                 zone_analytics = zone_tracker.get_zone_analytics(zone_idx)
                 zone_text = f"Zone {zone_idx}: {zone_analytics['current_occupancy']} people"
                 cv2.putText(
@@ -189,7 +228,7 @@ class ZoneAnalyzer:
                     self.colors.by_idx(zone_idx).as_bgr(),
                     2
                 )
-            
+
             # Add frame info and detection stats
             active_ids = list(detections.tracker_id) if len(detections) > 0 else []
             frame_text = f"Frame: {zone_tracker.frame_count} | Time: {zone_tracker.frame_count/video_info.fps:.1f}s"
