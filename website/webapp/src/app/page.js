@@ -9,6 +9,8 @@ import ZoneSelector from './components/ZoneSelector';
 import VideoProcessor from './components/VideoProcessor';
 import ProcessedVideoViewer from './components/ProcessedVideoViewer';
 import ZoneAnalytics from './components/ZoneAnalytics';
+import ActivityAnalytics from './components/ActivityAnalytics';
+import TimelineChart from './components/TimelineChart';
 import Charts from './components/Charts';
 import EnhancedCharts from './components/EnhancedCharts';
 
@@ -46,22 +48,39 @@ export default function Home() {
     if (result.files && result.files.csvPath) {
       try {
         const response = await fetch(`/api/download?file=${result.files.csvPath}&timestamp=${result.timestamp}`);
-        const csvText = await response.text();
 
-        // Parse CSV
-        const lines = csvText.split('\n');
-        const headers = lines[0].split(',');
-        const data = lines.slice(1).filter(line => line.trim()).map(line => {
+        if (!response.ok) {
+          console.error('Failed to fetch CSV:', response.status, response.statusText);
+          return;
+        }
+
+        const csvText = await response.text();
+        console.log('CSV loaded, length:', csvText.length);
+
+        // Parse CSV - handle both simple and quoted values
+        const lines = csvText.split('\n').filter(line => line.trim());
+        if (lines.length === 0) {
+          console.error('CSV is empty');
+          return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        console.log('CSV headers:', headers);
+
+        const data = lines.slice(1).map(line => {
           const values = line.split(',');
           const row = {};
           headers.forEach((header, i) => {
-            row[header.trim()] = values[i]?.trim() || '';
+            const value = values[i]?.trim() || '';
+            // Convert numeric strings to numbers
+            row[header] = isNaN(value) ? value : parseFloat(value);
           });
           return row;
         });
 
+        console.log('Parsed CSV data:', data.length, 'rows');
         setCsvData(data);
-        setCsvFileName(result.files.csvPath.split('/').pop());
+        setCsvFileName(result.files.csvPath.split('/').pop().split('\\').pop());
       } catch (error) {
         console.error('Failed to load CSV:', error);
       }
@@ -131,8 +150,22 @@ export default function Home() {
             </section>
           )}
 
+          {/* Timeline Chart - Show for any data with zones */}
+          {csvData.length > 0 && csvData[0]?.zone_id !== undefined && (
+            <section>
+              <TimelineChart csvData={csvData} fileName={csvFileName} />
+            </section>
+          )}
+
+          {/* Activity Analytics - Show for activity detection data */}
+          {csvData.length > 0 && csvData[0]?.activity && (
+            <section>
+              <ActivityAnalytics csvData={csvData} fileName={csvFileName} />
+            </section>
+          )}
+
           {/* Zone Analytics - Show for zone tracking data */}
-          {csvData.length > 0 && csvFileName.includes('analytics') && (
+          {csvData.length > 0 && csvFileName.includes('analytics') && !csvData[0]?.activity && (
             <section>
               <ZoneAnalytics csvData={csvData} fileName={csvFileName} />
             </section>

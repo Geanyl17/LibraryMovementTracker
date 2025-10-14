@@ -8,6 +8,7 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [confidence, setConfidence] = useState(0.3);
+  const [detectActivity, setDetectActivity] = useState(false);
 
   const handleProcess = async () => {
     if (!videoFile) {
@@ -60,8 +61,11 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
       formData.append('video', videoFile);
       formData.append('zones', JSON.stringify(polygonZones));
       formData.append('confidence', confidence.toString());
+      formData.append('detectActivity', detectActivity.toString());
 
-      setProgress('Processing video with zone tracking...');
+      setProgress(detectActivity
+        ? 'Processing video with activity detection...'
+        : 'Processing video with zone tracking...');
 
       const response = await fetch('/api/process-video', {
         method: 'POST',
@@ -120,6 +124,26 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
           </p>
         </div>
 
+        <div className="border-t pt-4">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={detectActivity}
+              onChange={(e) => setDetectActivity(e.target.checked)}
+              disabled={processing}
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-gray-700">
+                Enable Activity Detection
+              </span>
+              <p className="text-xs text-gray-500">
+                Detect activities: standing, walking, running, sitting/crouching, loitering, erratic movement
+              </p>
+            </div>
+          </label>
+        </div>
+
         {/* Status Display */}
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div className={`p-3 rounded ${videoFile ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
@@ -162,7 +186,7 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
             Processing Video...
           </span>
         ) : (
-          'Start Zone Tracking'
+          detectActivity ? 'Start Activity Detection' : 'Start Zone Tracking'
         )}
       </button>
 

@@ -4,7 +4,10 @@ Script to run activity detection analysis
 """
 
 import argparse
+import csv
 import json
+import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -15,7 +18,7 @@ import numpy as np
 from ultralytics import YOLO
 import supervision as sv
 
-# Add src to path  
+# Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from core.activity_detector import ActivityDetector
@@ -150,15 +153,28 @@ class ActivityVideoProcessor:
         video_info = sv.VideoInfo.from_video_path(video_path)
         activity_tracker = ActivityZoneTracker(fps=video_info.fps)
         
-        # Video writer
+        # Video writer - use H.264 codec for better browser compatibility
         video_writer = None
         if output_path:
+            # Try H.264 codec first (better browser support), fallback to mp4v
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 codec
             video_writer = cv2.VideoWriter(
                 output_path,
-                cv2.VideoWriter_fourcc(*'mp4v'),
+                fourcc,
                 video_info.fps,
                 (video_info.width, video_info.height)
             )
+
+            # If H.264 fails, try mp4v as fallback
+            if not video_writer.isOpened():
+                print("H.264 codec not available, using mp4v")
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                video_writer = cv2.VideoWriter(
+                    output_path,
+                    fourcc,
+                    video_info.fps,
+                    (video_info.width, video_info.height)
+                )
         
         frame_generator = sv.get_video_frames_generator(video_path)
         
@@ -257,7 +273,49 @@ class ActivityVideoProcessor:
             video_writer.release()
         if show_display:
             cv2.destroyAllWindows()
-        
+
+        # Re-encode video with H.264 for browser compatibility
+        if output_path and os.path.exists(output_path):
+            print("\nRe-encoding video with H.264 for browser compatibility...")
+            temp_path = output_path.replace('.mp4', '_temp.mp4')
+            os.rename(output_path, temp_path)
+
+            try:
+                # Use ffmpeg to re-encode with H.264
+                ffmpeg_cmd = [
+                    'ffmpeg', '-y', '-i', temp_path,
+                    '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
+                    '-pix_fmt', 'yuv420p',  # Ensure compatibility
+                    output_path
+                ]
+                subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+                os.remove(temp_path)  # Remove temp file
+                print(f"Video re-encoded successfully: {output_path}")
+            except subprocess.CalledProcessError as e:
+                print(f"Warning: Failed to re-encode video: {e}")
+                print("Reverting to original encoding...")
+                os.rename(temp_path, output_path)
+            except FileNotFoundError:
+                print("Warning: ffmpeg not found. Video may not be playable in browsers.")
+                os.rename(temp_path, output_path)
+
+        # Save analytics data to JSON
+        if analytics_output:
+            json_path = analytics_output if analytics_output.endswith('.json') else f"{analytics_output}.json"
+            with open(json_path, 'w') as f:
+                json.dump(activity_tracker.analytics_data, f, indent=2)
+            print(f"Analytics saved to: {json_path}")
+
+            # Also save as CSV
+            csv_path = json_path.replace('.json', '.csv')
+            if activity_tracker.analytics_data:
+                fieldnames = activity_tracker.analytics_data[0].keys()
+                with open(csv_path, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(activity_tracker.analytics_data)
+                print(f"CSV saved to: {csv_path}")
+
         print("\n=== ACTIVITY DETECTION COMPLETE ===")
     
     def _draw_activity_legend(self, frame: np.ndarray):

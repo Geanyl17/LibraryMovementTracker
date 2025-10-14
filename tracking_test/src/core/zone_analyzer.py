@@ -3,6 +3,8 @@ Main zone analyzer class for video processing
 """
 
 import json
+import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -254,7 +256,32 @@ class ZoneAnalyzer:
             video_writer.release()
         if show_display:
             cv2.destroyAllWindows()
-        
+
+        # Re-encode video with H.264 for browser compatibility
+        if output_path and os.path.exists(output_path):
+            print("\nRe-encoding video with H.264 for browser compatibility...")
+            temp_path = output_path.replace('.mp4', '_temp.mp4')
+            os.rename(output_path, temp_path)
+
+            try:
+                # Use ffmpeg to re-encode with H.264
+                ffmpeg_cmd = [
+                    'ffmpeg', '-y', '-i', temp_path,
+                    '-c:v', 'libx264', '-preset', 'medium', '-crf', '23',
+                    '-pix_fmt', 'yuv420p',  # Ensure compatibility
+                    output_path
+                ]
+                subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+                os.remove(temp_path)  # Remove temp file
+                print(f"Video re-encoded successfully: {output_path}")
+            except subprocess.CalledProcessError as e:
+                print(f"Warning: Failed to re-encode video: {e}")
+                print("Reverting to original encoding...")
+                os.rename(temp_path, output_path)
+            except FileNotFoundError:
+                print("Warning: ffmpeg not found. Video may not be playable in browsers.")
+                os.rename(temp_path, output_path)
+
         # Export analytics
         zone_tracker.export_analytics(analytics_output)
         

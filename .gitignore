@@ -140,7 +140,7 @@ dmypy.json
 *.csv
 *.xlsx
 *.json
-!webapp/**/*.json
+!website/webapp/*.json
 
 # IDE
 .vscode/

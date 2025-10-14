@@ -8,6 +8,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const filePath = searchParams.get('file');
     const timestamp = searchParams.get('timestamp');
+    const inline = searchParams.get('inline') === 'true'; // Support inline display
 
     if (!filePath) {
       return NextResponse.json({ error: 'No file specified' }, { status: 400 });
@@ -54,13 +55,20 @@ export async function GET(request) {
     }
 
     // Create response with proper headers
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': fileBuffer.length.toString(),
-      },
-    });
+    const headers = {
+      'Content-Type': contentType,
+      'Content-Length': fileBuffer.length.toString(),
+    };
+
+    // For videos, allow inline display if requested, otherwise force download
+    if (ext === '.mp4' && inline) {
+      headers['Content-Disposition'] = `inline; filename="${fileName}"`;
+      headers['Accept-Ranges'] = 'bytes';
+    } else {
+      headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+    }
+
+    return new NextResponse(fileBuffer, { headers });
 
   } catch (error) {
     console.error('Download error:', error);

@@ -13,6 +13,7 @@ export async function POST(request) {
     const videoFile = formData.get('video');
     const zonesData = formData.get('zones');
     const confidence = formData.get('confidence') || '0.3';
+    const detectActivity = formData.get('detectActivity') === 'true';
 
     if (!videoFile) {
       return NextResponse.json({ error: 'No video file provided' }, { status: 400 });
@@ -66,11 +67,14 @@ export async function POST(request) {
     await mkdir(path.join(outputsDir, 'analytics', 'json'), { recursive: true });
     await mkdir(path.join(outputsDir, 'analytics', 'excel'), { recursive: true });
 
-    // Run the tracking script
-    const pythonScript = path.join(projectRoot, 'scripts', 'track_zones.py');
+    // Run the tracking script - use activity detection script if requested
+    const pythonScript = detectActivity
+      ? path.join(projectRoot, 'scripts', 'detect_activity.py')
+      : path.join(projectRoot, 'scripts', 'track_zones.py');
     const command = `python "${pythonScript}" --video "${videoPath}" --zones "${zonesPath}" --output "${outputVideoPath}" --analytics "${analyticsPath}" --confidence ${confidence} --no-display`;
 
     console.log('Executing command:', command);
+    console.log('Activity detection:', detectActivity ? 'enabled' : 'disabled');
 
     try {
       const { stdout, stderr } = await execAsync(command, {
@@ -84,17 +88,27 @@ export async function POST(request) {
       }
 
       // Return success with file paths
+      // Activity detection saves files directly in outputs/, while track_zones saves in subdirectories
+      const csvPath = detectActivity
+        ? `analytics_${timestamp}.csv`
+        : path.join('analytics', 'csv', `analytics_${timestamp}.csv`);
+      const jsonPath = detectActivity
+        ? `analytics_${timestamp}.json`
+        : path.join('analytics', 'json', `analytics_${timestamp}.json`);
+      const excelPath = path.join('analytics', 'excel', `analytics_${timestamp}.xlsx`);
+
       return NextResponse.json({
         success: true,
         message: 'Video processed successfully',
+        activityDetection: detectActivity,
         files: {
           video: videoFileName,
           zones: zonesFileName,
           processedVideo: `processed_${timestamp}.mp4`,
           analytics: `analytics_${timestamp}`,
-          csvPath: path.join('analytics', 'csv', `analytics_${timestamp}.csv`),
-          jsonPath: path.join('analytics', 'json', `analytics_${timestamp}.json`),
-          excelPath: path.join('analytics', 'excel', `analytics_${timestamp}.xlsx`)
+          csvPath,
+          jsonPath,
+          excelPath
         },
         timestamp
       });
