@@ -14,6 +14,7 @@ from ultralytics import YOLO
 import supervision as sv
 
 from .zone_tracker import ZoneTracker
+from .enhanced_tracker import EnhancedTracker
 
 
 class ZoneAnalyzer:
@@ -27,12 +28,15 @@ class ZoneAnalyzer:
         iou_threshold: float = 0.7
     ):
         self.model = YOLO(model_path)
-        # Configure ByteTrack for better ID consistency
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.4,    # Lower threshold to detect stationary people
-            lost_track_buffer=30,              # Keep lost tracks for 30 frames (~1 second at 25fps)
-            minimum_matching_threshold=0.6,    # Moderate matching threshold
-            minimum_consecutive_frames=1       # Assign ID immediately for stationary people
+        # Use EnhancedTracker with ghost buffer to prevent ID reassignment
+        self.tracker = EnhancedTracker(
+            track_activation_threshold=0.25,   # Lower threshold for initial detection
+            lost_track_buffer=150,             # Keep lost tracks for 5 seconds at 30fps (more patient)
+            minimum_matching_threshold=0.8,    # HIGHER threshold = stricter matching (fewer new IDs)
+            minimum_consecutive_frames=3,      # Require 3 frames before assigning new ID (reduce noise)
+            ghost_buffer_frames=150,           # Keep ghost tracks for 5 seconds at 30fps
+            ghost_iou_threshold=0.2,           # LOWER = more lenient ghost matching
+            ghost_distance_threshold=200.0     # HIGHER = match people further away
         )
         self.device = device
         self.confidence_threshold = confidence_threshold
@@ -233,9 +237,11 @@ class ZoneAnalyzer:
 
             # Add frame info and detection stats
             active_ids = list(detections.tracker_id) if len(detections) > 0 else []
+            ghost_count = self.tracker.get_ghost_count()
+
             frame_text = f"Frame: {zone_tracker.frame_count} | Time: {zone_tracker.frame_count/video_info.fps:.1f}s"
-            ids_text = f"Active IDs: {len(active_ids)} | IDs: {active_ids[:5]}{'...' if len(active_ids) > 5 else ''}"
-            
+            ids_text = f"Active IDs: {len(active_ids)} | Ghosts: {ghost_count} | IDs: {active_ids[:5]}{'...' if len(active_ids) > 5 else ''}"
+
             cv2.putText(annotated_frame, frame_text, (10, annotated_frame.shape[0] - 40),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             cv2.putText(annotated_frame, ids_text, (10, annotated_frame.shape[0] - 20),

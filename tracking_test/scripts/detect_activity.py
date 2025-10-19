@@ -22,6 +22,7 @@ import supervision as sv
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from core.activity_detector import ActivityDetector
+from core.enhanced_tracker import EnhancedTracker
 
 
 class ActivityZoneTracker:
@@ -95,12 +96,15 @@ class ActivityVideoProcessor:
         confidence_threshold: float = 0.3
     ):
         self.model = YOLO(model_path)
-        # Configure ByteTrack for better ID consistency
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=0.5,    # Higher threshold - only track confident detections
-            lost_track_buffer=300,              # Keep lost tracks for 30 frames (~1 second at 25fps)
-            minimum_matching_threshold=0.5,    # Higher matching threshold for stricter ID matching
-            minimum_consecutive_frames=5       # Require 3 consecutive frames before assigning ID
+        # Use EnhancedTracker with ghost buffer to prevent ID reassignment (optimized)
+        self.tracker = EnhancedTracker(
+            track_activation_threshold=0.25,   # Lower threshold for initial detection
+            lost_track_buffer=150,             # Keep lost tracks for 5 seconds at 30fps (more patient)
+            minimum_matching_threshold=0.8,    # HIGHER threshold = stricter matching (fewer new IDs)
+            minimum_consecutive_frames=3,      # Require 3 frames before assigning new ID (reduce noise)
+            ghost_buffer_frames=150,           # Keep ghost tracks for 5 seconds at 30fps
+            ghost_iou_threshold=0.2,           # LOWER = more lenient ghost matching
+            ghost_distance_threshold=200.0     # HIGHER = match people further away
         )
         self.device = device
         self.confidence_threshold = confidence_threshold
@@ -253,9 +257,10 @@ class ActivityVideoProcessor:
             
             # Add activity legend
             self._draw_activity_legend(annotated_frame)
-            
-            # Add frame info
-            frame_text = f"Frame: {activity_tracker.frame_count} | People: {len(detections)}"
+
+            # Add frame info with ghost tracking
+            ghost_count = self.tracker.get_ghost_count()
+            frame_text = f"Frame: {activity_tracker.frame_count} | People: {len(detections)} | Ghosts: {ghost_count}"
             cv2.putText(annotated_frame, frame_text, (10, annotated_frame.shape[0] - 20),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             

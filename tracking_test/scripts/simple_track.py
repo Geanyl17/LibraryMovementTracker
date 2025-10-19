@@ -4,10 +4,17 @@ Simple person tracking without zones
 """
 
 import argparse
+import sys
+from pathlib import Path
 import cv2
 import numpy as np
 from ultralytics import YOLO
 import supervision as sv
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from core.enhanced_tracker import EnhancedTracker
 
 
 def main():
@@ -24,11 +31,15 @@ def main():
 
     # Initialize model and tracker
     model = YOLO(args.model)
-    tracker = sv.ByteTrack(
-        track_activation_threshold=0.25,
-        lost_track_buffer=60,
-        minimum_matching_threshold=0.3,
-        minimum_consecutive_frames=1
+    # Use EnhancedTracker with ghost buffer to prevent ID reassignment
+    tracker = EnhancedTracker(
+        track_activation_threshold=0.25,   # Lower threshold for initial detection
+        lost_track_buffer=150,             # Keep lost tracks for 5 seconds at 30fps (more patient)
+        minimum_matching_threshold=0.8,    # HIGHER threshold = stricter matching (fewer new IDs)
+        minimum_consecutive_frames=3,      # Require 3 frames before assigning new ID (reduce noise)
+        ghost_buffer_frames=150,           # Keep ghost tracks for 5 seconds at 30fps
+        ghost_iou_threshold=0.2,           # LOWER = more lenient ghost matching
+        ghost_distance_threshold=200.0     # HIGHER = match people further away
     )
 
     # Video setup
@@ -82,17 +93,21 @@ def main():
         annotated_frame = frame.copy()
         annotated_frame = box_annotator.annotate(scene=annotated_frame, detections=detections)
 
-        # Add labels with tracker IDs
+        # Add labels with tracker IDs and confidence scores
         if len(detections) > 0:
-            labels = [f"#{tracker_id}" for tracker_id in detections.tracker_id]
+            labels = [
+                f"#{tracker_id} ({confidence:.2f})"
+                for tracker_id, confidence in zip(detections.tracker_id, detections.confidence)
+            ]
             annotated_frame = label_annotator.annotate(
                 scene=annotated_frame,
                 detections=detections,
                 labels=labels
             )
 
-        # Add frame info
-        frame_text = f"Frame: {frame_count} | People: {len(detections)}"
+        # Add frame info with ghost tracking
+        ghost_count = tracker.get_ghost_count()
+        frame_text = f"Frame: {frame_count} | People: {len(detections)} | Ghosts: {ghost_count}"
         cv2.putText(annotated_frame, frame_text, (10, 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 

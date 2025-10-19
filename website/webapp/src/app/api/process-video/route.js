@@ -15,6 +15,11 @@ export async function POST(request) {
     const confidence = formData.get('confidence') || '0.3';
     const detectActivity = formData.get('detectActivity') === 'true';
 
+    // Enhanced tracking parameters
+    const ghostBufferSeconds = formData.get('ghostBufferSeconds') || '3';
+    const ghostIouThreshold = formData.get('ghostIouThreshold') || '0.3';
+    const ghostDistanceThreshold = formData.get('ghostDistanceThreshold') || '150';
+
     if (!videoFile) {
       return NextResponse.json({ error: 'No video file provided' }, { status: 400 });
     }
@@ -67,19 +72,21 @@ export async function POST(request) {
     await mkdir(path.join(outputsDir, 'analytics', 'json'), { recursive: true });
     await mkdir(path.join(outputsDir, 'analytics', 'excel'), { recursive: true });
 
-    // Run the tracking script - use activity detection script if requested
+    // Run the tracking script - use configurable versions with enhanced tracking
     const pythonScript = detectActivity
-      ? path.join(projectRoot, 'scripts', 'detect_activity.py')
-      : path.join(projectRoot, 'scripts', 'track_zones.py');
-    const command = `python "${pythonScript}" --video "${videoPath}" --zones "${zonesPath}" --output "${outputVideoPath}" --analytics "${analyticsPath}" --confidence ${confidence} --no-display`;
+      ? path.join(projectRoot, 'scripts', 'detect_activity_configurable.py')
+      : path.join(projectRoot, 'scripts', 'track_zones_configurable.py');
+    const command = `python "${pythonScript}" --video "${videoPath}" --zones "${zonesPath}" --output "${outputVideoPath}" --analytics "${analyticsPath}" --confidence ${confidence} --ghost-buffer-seconds ${ghostBufferSeconds} --ghost-iou-threshold ${ghostIouThreshold} --ghost-distance-threshold ${ghostDistanceThreshold} --no-display`;
 
     console.log('Executing command:', command);
     console.log('Activity detection:', detectActivity ? 'enabled' : 'disabled');
+    console.log('Ghost buffer settings:', { ghostBufferSeconds, ghostIouThreshold, ghostDistanceThreshold });
 
     try {
       const { stdout, stderr } = await execAsync(command, {
         cwd: projectRoot,
-        timeout: 300000 // 5 minutes timeout
+        timeout: 300000, // 5 minutes timeout
+        maxBuffer: 10 * 1024 * 1024 // 10MB buffer (instead of default 1MB)
       });
 
       console.log('Processing stdout:', stdout);
