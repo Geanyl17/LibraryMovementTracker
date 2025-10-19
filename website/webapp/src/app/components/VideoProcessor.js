@@ -151,10 +151,32 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
                 Enable Activity Detection
               </span>
               <p className="text-xs text-gray-500">
-                Detect activities: standing, walking, running, sitting/crouching, loitering, erratic movement
+                Detect activities: sitting, standing, reading, loitering
               </p>
             </div>
           </label>
+
+          {detectActivity && (
+            <div className="mt-3 ml-8">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={usePoseDetection}
+                  onChange={(e) => setUsePoseDetection(e.target.checked)}
+                  disabled={processing}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">
+                    Use Pose-Based Detection (Recommended)
+                  </span>
+                  <p className="text-xs text-gray-500">
+                    More accurate activity detection using skeleton keypoints. Only runs on people inside zones for better performance.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Advanced Tracking Settings */}

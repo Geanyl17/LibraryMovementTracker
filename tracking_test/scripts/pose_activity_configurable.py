@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test pose-based activity detection
+Configurable pose-based activity detection for webapp
+Only runs pose detection on people inside zones (performance optimized)
 """
 
 import argparse
@@ -62,7 +63,7 @@ class PoseActivityTracker:
         for i, tracker_id in enumerate(detections_in_zone.tracker_id):
             bbox = detections_in_zone.xyxy[i]
 
-            # Detect activity using pose
+            # Detect activity using pose (ONLY for people inside zones)
             activity = self.activity_detector.classify_activity(
                 person_id=tracker_id,
                 frame=frame,
@@ -74,7 +75,6 @@ class PoseActivityTracker:
             if tracker_id not in self.zone_entries[zone_id]:
                 self.zone_entries[zone_id][tracker_id] = current_time
                 self.zone_activities[zone_id][tracker_id] = []
-                print(f"Person {tracker_id} entered Zone {zone_id}: {activity}")
 
             # Store activity
             self.zone_activities[zone_id][tracker_id].append(activity)
@@ -95,21 +95,29 @@ class PoseActivityTracker:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Pose-based activity detection")
+    parser = argparse.ArgumentParser(description="Pose-based activity detection (configurable)")
     parser.add_argument("--video", required=True, help="Path to input video")
     parser.add_argument("--zones", required=True, help="Path to zone configuration JSON")
     parser.add_argument("--model", default="yolov8n.pt", help="YOLO detection model")
     parser.add_argument("--device", default="cpu", choices=["cpu", "cuda"], help="Device")
-    parser.add_argument("--confidence", type=float, default=0.5, help="Detection confidence")
+    parser.add_argument("--confidence", type=float, default=0.3, help="Detection confidence")
     parser.add_argument("--output", help="Output video path")
     parser.add_argument("--analytics", default="pose_analytics", help="Analytics output")
     parser.add_argument("--no-display", action="store_true", help="Disable display")
 
+    # Enhanced tracking parameters
+    parser.add_argument("--ghost-buffer-seconds", type=float, default=5.0, help="Ghost buffer duration")
+    parser.add_argument("--ghost-iou-threshold", type=float, default=0.2, help="IoU threshold")
+    parser.add_argument("--ghost-distance-threshold", type=float, default=200.0, help="Distance threshold")
+    parser.add_argument("--fps", type=int, default=30, help="Video FPS")
+
     args = parser.parse_args()
 
     # Initialize models
-    print("Loading models...")
     detection_model = YOLO(args.model)
+
+    # Calculate ghost buffer frames
+    ghost_buffer_frames = int(args.ghost_buffer_seconds * args.fps)
 
     # Enhanced tracker
     tracker = EnhancedTracker(
@@ -117,9 +125,9 @@ def main():
         lost_track_buffer=150,
         minimum_matching_threshold=0.8,
         minimum_consecutive_frames=3,
-        ghost_buffer_frames=150,
-        ghost_iou_threshold=0.2,
-        ghost_distance_threshold=200.0
+        ghost_buffer_frames=ghost_buffer_frames,
+        ghost_iou_threshold=args.ghost_iou_threshold,
+        ghost_distance_threshold=args.ghost_distance_threshold
     )
 
     # Load zones
@@ -139,13 +147,11 @@ def main():
     video_info = sv.VideoInfo.from_video_path(args.video)
     activity_tracker = PoseActivityTracker(fps=video_info.fps)
 
-    # Activity colors
+    # Activity colors (library-specific)
     activity_colors = {
         'standing': sv.Color.GREEN,
-        'walking': sv.Color.BLUE,
-        'walking_slow': sv.Color.from_rgb_tuple((0, 255, 255)),
-        'running': sv.Color.RED,
-        'sitting/crouching': sv.Color.YELLOW,
+        'sitting': sv.Color.YELLOW,
+        'reading': sv.Color.BLUE,
         'loitering': sv.Color.from_rgb_tuple((255, 165, 0)),
         'unknown': sv.Color.from_rgb_tuple((128, 128, 128))
     }
@@ -162,9 +168,6 @@ def main():
         )
 
     frame_generator = sv.get_video_frames_generator(args.video)
-
-    print(f"\nProcessing video with POSE-BASED activity detection: {args.video}")
-    print("This will be MORE ACCURATE than bbox-based detection!\n")
 
     for frame in frame_generator:
         activity_tracker.frame_count += 1
@@ -251,7 +254,7 @@ def main():
             video_writer.write(annotated_frame)
 
         if not args.no_display:
-            cv2.imshow("Pose-Based Activity Detection", annotated_frame)
+            cv2.imshow("Activity Detection", annotated_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -265,7 +268,6 @@ def main():
     json_path = f"{args.analytics}.json"
     with open(json_path, 'w') as f:
         json.dump(activity_tracker.analytics_data, f, indent=2)
-    print(f"Analytics saved to: {json_path}")
 
     # Save CSV
     csv_path = f"{args.analytics}.csv"
@@ -275,9 +277,6 @@ def main():
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(activity_tracker.analytics_data)
-        print(f"CSV saved to: {csv_path}")
-
-    print("\n=== POSE-BASED ACTIVITY DETECTION COMPLETE ===")
 
 
 if __name__ == "__main__":
