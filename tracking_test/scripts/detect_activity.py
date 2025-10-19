@@ -98,9 +98,9 @@ class ActivityVideoProcessor:
         # Configure ByteTrack for better ID consistency
         self.tracker = sv.ByteTrack(
             track_activation_threshold=0.5,    # Higher threshold - only track confident detections
-            lost_track_buffer=30,              # Keep lost tracks for 30 frames (~1 second at 25fps)
-            minimum_matching_threshold=0.7,    # Higher matching threshold for stricter ID matching
-            minimum_consecutive_frames=3       # Require 3 consecutive frames before assigning ID
+            lost_track_buffer=300,              # Keep lost tracks for 30 frames (~1 second at 25fps)
+            minimum_matching_threshold=0.5,    # Higher matching threshold for stricter ID matching
+            minimum_consecutive_frames=5       # Require 3 consecutive frames before assigning ID
         )
         self.device = device
         self.confidence_threshold = confidence_threshold
