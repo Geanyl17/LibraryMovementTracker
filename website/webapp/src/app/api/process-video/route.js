@@ -14,7 +14,6 @@ export async function POST(request) {
     const zonesData = formData.get('zones');
     const confidence = formData.get('confidence') || '0.3';
     const detectActivity = formData.get('detectActivity') === 'true';
-    const usePoseDetection = formData.get('usePoseDetection') === 'true';
 
     // Enhanced tracking parameters
     const ghostBufferSeconds = formData.get('ghostBufferSeconds') || '5';
@@ -73,21 +72,20 @@ export async function POST(request) {
     await mkdir(path.join(outputsDir, 'analytics', 'json'), { recursive: true });
     await mkdir(path.join(outputsDir, 'analytics', 'excel'), { recursive: true });
 
-    // Run the tracking script - use pose-based if activity detection enabled
+    // Run the tracking script - use new pose-temporal activity detector if enabled
     let pythonScript;
-    if (detectActivity && usePoseDetection) {
-      pythonScript = path.join(projectRoot, 'scripts', 'pose_activity_configurable.py');
-    } else if (detectActivity) {
-      pythonScript = path.join(projectRoot, 'scripts', 'detect_activity_configurable.py');
+    if (detectActivity) {
+      // Use the new integrated activity + zone tracking script
+      pythonScript = path.join(projectRoot, 'scripts', 'detect_activity_zones.py');
     } else {
+      // Use regular zone tracking
       pythonScript = path.join(projectRoot, 'scripts', 'track_zones_configurable.py');
     }
 
-    const command = `python "${pythonScript}" --video "${videoPath}" --zones "${zonesPath}" --output "${outputVideoPath}" --analytics "${analyticsPath}" --confidence ${confidence} --ghost-buffer-seconds ${ghostBufferSeconds} --ghost-iou-threshold ${ghostIouThreshold} --ghost-distance-threshold ${ghostDistanceThreshold} --no-display`;
+    const command = `python "${pythonScript}" --video "${videoPath}" --zones "${zonesPath}" --output "${outputVideoPath}" --analytics "${analyticsPath}" --conf ${confidence} --ghost-buffer-seconds ${ghostBufferSeconds} --ghost-iou-threshold ${ghostIouThreshold} --ghost-distance-threshold ${ghostDistanceThreshold} --no-display`;
 
     console.log('Executing command:', command);
-    console.log('Activity detection:', detectActivity ? 'enabled' : 'disabled');
-    console.log('Pose-based detection:', (detectActivity && usePoseDetection) ? 'enabled' : 'disabled');
+    console.log('Activity detection:', detectActivity ? 'enabled (Pose-Temporal)' : 'disabled');
     console.log('Ghost buffer settings:', { ghostBufferSeconds, ghostIouThreshold, ghostDistanceThreshold });
 
     try {

@@ -9,7 +9,6 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
   const [error, setError] = useState('');
   const [confidence, setConfidence] = useState(0.5);  // Better default (was 0.3)
   const [detectActivity, setDetectActivity] = useState(false);
-  const [usePoseDetection, setUsePoseDetection] = useState(true);  // Use pose-based by default
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Enhanced tracking parameters (optimized defaults for production)
@@ -69,7 +68,6 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
       formData.append('zones', JSON.stringify(polygonZones));
       formData.append('confidence', confidence.toString());
       formData.append('detectActivity', detectActivity.toString());
-      formData.append('usePoseDetection', usePoseDetection.toString());
 
       // Enhanced tracking parameters
       formData.append('ghostBufferSeconds', ghostBufferSeconds.toString());
@@ -77,7 +75,7 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
       formData.append('ghostDistanceThreshold', ghostDistanceThreshold.toString());
 
       setProgress(detectActivity
-        ? 'Processing video with activity detection...'
+        ? 'Processing video with Pose-Temporal activity detection...'
         : 'Processing video with zone tracking...');
 
       const response = await fetch('/api/process-video', {
@@ -148,35 +146,13 @@ export default function VideoProcessor({ videoFile, zones, videoSize, onProcessi
             />
             <div>
               <span className="text-sm font-medium text-gray-700">
-                Enable Activity Detection
+                Enable Activity Detection (Pose-Temporal)
               </span>
               <p className="text-xs text-gray-500">
-                Detect activities: sitting, standing, reading, loitering
+                Detect activities: sitting, reading, standing, walking (slow/normal/fast), jogging, running
               </p>
             </div>
           </label>
-
-          {detectActivity && (
-            <div className="mt-3 ml-8">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={usePoseDetection}
-                  onChange={(e) => setUsePoseDetection(e.target.checked)}
-                  disabled={processing}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-sm font-medium text-gray-700">
-                    Use Pose-Based Detection (Recommended)
-                  </span>
-                  <p className="text-xs text-gray-500">
-                    More accurate activity detection using skeleton keypoints. Only runs on people inside zones for better performance.
-                  </p>
-                </div>
-              </label>
-            </div>
-          )}
         </div>
 
         {/* Advanced Tracking Settings */}

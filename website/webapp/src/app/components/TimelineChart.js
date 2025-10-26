@@ -265,6 +265,17 @@ export default function TimelineChart({ csvData, fileName }) {
         </ResponsiveContainer>
       </div>
 
+      {/* Chart Description */}
+      <div className="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+        <p className="text-sm text-gray-700 leading-relaxed">
+          <strong>What this shows:</strong> This timeline tracks how many people were detected in each zone throughout the video duration.
+          Each colored line represents a different zone, with peaks indicating busy periods and valleys showing quieter moments.
+          The red dashed line marks the maximum occupancy reached across all zones.
+          Use the zone filters above to focus on specific areas and identify traffic patterns, rush hours, or unusual activity spikes.
+          Hover over the graph to see exact counts at any point in time.
+        </p>
+      </div>
+
       {/* Statistics Summary */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
         {displayZones.map(zoneId => {

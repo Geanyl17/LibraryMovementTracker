@@ -58,7 +58,12 @@ export default function ZoneSelector({ videoUrl, onZonesChange }) {
       endX: pos.x,
       endY: pos.y,
       name: `Zone ${zones.length + 1}`,
-      color: getRandomColor()
+      color: getRandomColor(),
+      occupancyThresholds: {
+        low: 5,
+        medium: 15,
+        high: 30
+      }
     });
   };
 
@@ -152,9 +157,19 @@ export default function ZoneSelector({ videoUrl, onZonesChange }) {
   };
 
   const renameZone = (zoneId, newName) => {
-    setZones(prev => prev.map(zone => 
+    setZones(prev => prev.map(zone =>
       zone.id === zoneId ? { ...zone, name: newName } : zone
     ));
+  };
+
+  const updateOccupancyThresholds = (zoneId, thresholds) => {
+    setZones(prev => prev.map(zone =>
+      zone.id === zoneId ? { ...zone, occupancyThresholds: thresholds } : zone
+    ));
+    // Update selected zone to reflect changes
+    if (selectedZone?.id === zoneId) {
+      setSelectedZone(prev => ({ ...prev, occupancyThresholds: thresholds }));
+    }
   };
 
   const clearAllZones = () => {
@@ -306,10 +321,86 @@ export default function ZoneSelector({ videoUrl, onZonesChange }) {
                   <span className="ml-2 font-mono text-xs">{selectedZone.id}</span>
                 </div>
               </div>
-              
+
+              {/* Occupancy Thresholds */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="font-semibold text-sm mb-3 text-gray-700">
+                  Occupancy Thresholds
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Set the number of people to define Low, Medium, and High occupancy levels for this zone
+                </p>
+
+                <div className="space-y-3">
+                  {/* Low Threshold */}
+                  <div>
+                    <label className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600">🟢 Low (1 to X people)</span>
+                      <span className="font-semibold">{selectedZone.occupancyThresholds?.low || 5}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={selectedZone.occupancyThresholds?.low || 5}
+                      onChange={(e) => updateOccupancyThresholds(selectedZone.id, {
+                        ...selectedZone.occupancyThresholds,
+                        low: parseInt(e.target.value)
+                      })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Medium Threshold */}
+                  <div>
+                    <label className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600">🟡 Medium (X to Y people)</span>
+                      <span className="font-semibold">{selectedZone.occupancyThresholds?.medium || 15}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="5"
+                      max="30"
+                      value={selectedZone.occupancyThresholds?.medium || 15}
+                      onChange={(e) => updateOccupancyThresholds(selectedZone.id, {
+                        ...selectedZone.occupancyThresholds,
+                        medium: parseInt(e.target.value)
+                      })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* High Threshold */}
+                  <div>
+                    <label className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-600">🔴 High (Y+ people)</span>
+                      <span className="font-semibold">{selectedZone.occupancyThresholds?.high || 30}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="50"
+                      value={selectedZone.occupancyThresholds?.high || 30}
+                      onChange={(e) => updateOccupancyThresholds(selectedZone.id, {
+                        ...selectedZone.occupancyThresholds,
+                        high: parseInt(e.target.value)
+                      })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                  <strong>Current ranges:</strong><br/>
+                  Low: 1-{selectedZone.occupancyThresholds?.low || 5} |
+                  Medium: {(selectedZone.occupancyThresholds?.low || 5) + 1}-{selectedZone.occupancyThresholds?.medium || 15} |
+                  High: {(selectedZone.occupancyThresholds?.medium || 15) + 1}+
+                </div>
+              </div>
+
               <button
                 onClick={() => deleteZone(selectedZone.id)}
-                className="mt-3 bg-red-500 text-white px-3 py-1 text-sm rounded hover:bg-red-600 transition-colors"
+                className="mt-4 bg-red-500 text-white px-3 py-1 text-sm rounded hover:bg-red-600 transition-colors w-full"
               >
                 Delete Zone
               </button>

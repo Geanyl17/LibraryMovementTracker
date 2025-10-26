@@ -217,6 +217,11 @@ export default function ZoneAnalytics({ csvData, fileName }) {
               }
             }}
           />
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+            <strong>What this shows:</strong> Compares the total number of people who entered each zone during the entire video.
+            Taller bars indicate higher traffic zones where more people passed through.
+            Use this to identify which areas received the most foot traffic and may need more attention or resources.
+          </div>
         </div>
 
         {/* Average Dwell Time by Zone */}
@@ -247,6 +252,11 @@ export default function ZoneAnalytics({ csvData, fileName }) {
               }
             }}
           />
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+            <strong>What this shows:</strong> Displays how long people typically spent in each zone on average.
+            Higher values suggest zones where people linger longer, possibly reading areas, waiting zones, or points of interest.
+            Lower values indicate quick pass-through zones like corridors or entrances. This helps understand visitor behavior patterns.
+          </div>
         </div>
 
         {/* Traffic Over Time */}
@@ -276,6 +286,11 @@ export default function ZoneAnalytics({ csvData, fileName }) {
               }
             }}
           />
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+            <strong>What this shows:</strong> Tracks how many people entered zones every minute throughout the video duration.
+            Peaks represent busy periods while valleys show quieter times.
+            This pattern analysis helps identify rush hours, slow periods, and optimal staffing times based on visitor flow throughout the day.
+          </div>
         </div>
 
         {/* Dwell Time Distribution */}
@@ -298,6 +313,11 @@ export default function ZoneAnalytics({ csvData, fileName }) {
               }
             }}
           />
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+            <strong>What this shows:</strong> Breaks down how long people stayed in zones, grouped into time ranges.
+            Each slice represents the proportion of visits that fell within that duration category.
+            Larger slices for shorter durations suggest quick pass-throughs, while larger slices for longer durations indicate zones where people spend more time engaging with content or activities.
+          </div>
         </div>
       </div>
 

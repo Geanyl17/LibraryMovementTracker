@@ -10,30 +10,36 @@ export default function ActivityAnalytics({ csvData, fileName }) {
     const hasActivityColumn = csvData[0]?.activity !== undefined;
     if (!hasActivityColumn) return null;
 
-    // Count activities by type
+    // Count activities by type and track unique IDs
     const activityCounts = {};
-    const activityByPerson = {};
+    const uniquePersonIds = new Set();
     const activityByZone = {};
     let totalDetections = 0;
+    let totalConfidence = 0;
+    let confidenceCount = 0;
 
     csvData.forEach(row => {
       const activity = row.activity || 'unknown';
       const personId = row.person_id || row.track_id;
       const zoneId = row.zone_id;
+      const confidence = parseFloat(row.confidence || 0);
 
       // Count by activity type
       activityCounts[activity] = (activityCounts[activity] || 0) + 1;
       totalDetections++;
 
-      // Count by person
-      if (personId) {
-        if (!activityByPerson[personId]) {
-          activityByPerson[personId] = {};
-        }
-        activityByPerson[personId][activity] = (activityByPerson[personId][activity] || 0) + 1;
+      // Track unique person IDs
+      if (personId !== undefined) {
+        uniquePersonIds.add(personId);
       }
 
-      // Count by zone
+      // Track confidence scores
+      if (confidence > 0) {
+        totalConfidence += confidence;
+        confidenceCount++;
+      }
+
+      // Count by zone (with activity breakdown)
       if (zoneId !== undefined) {
         if (!activityByZone[zoneId]) {
           activityByZone[zoneId] = {};
@@ -41,6 +47,11 @@ export default function ActivityAnalytics({ csvData, fileName }) {
         activityByZone[zoneId][activity] = (activityByZone[zoneId][activity] || 0) + 1;
       }
     });
+
+    // Calculate average confidence as percentage
+    const avgConfidencePercent = confidenceCount > 0
+      ? ((totalConfidence / confidenceCount) * 100).toFixed(1)
+      : 0;
 
     // Sort activities by count
     const sortedActivities = Object.entries(activityCounts)
@@ -51,29 +62,50 @@ export default function ActivityAnalytics({ csvData, fileName }) {
         percentage: ((count / totalDetections) * 100).toFixed(1)
       }));
 
+    // Calculate zone activity percentages
+    const zoneActivityPercentages = {};
+    Object.entries(activityByZone).forEach(([zoneId, activities]) => {
+      const zoneTotal = Object.values(activities).reduce((sum, count) => sum + count, 0);
+      zoneActivityPercentages[zoneId] = {};
+      Object.entries(activities).forEach(([activity, count]) => {
+        zoneActivityPercentages[zoneId][activity] = {
+          count,
+          percentage: ((count / zoneTotal) * 100).toFixed(1)
+        };
+      });
+    });
+
     return {
       activityCounts,
       sortedActivities,
-      activityByPerson,
       activityByZone,
-      totalDetections,
+      zoneActivityPercentages,
+      totalDetections: uniquePersonIds.size, // Changed: now using unique IDs
       uniqueActivities: Object.keys(activityCounts).length,
-      uniquePeople: Object.keys(activityByPerson).length
+      avgConfidencePercent // Changed: now average confidence instead of unique people
     };
   }, [csvData]);
 
   if (!activityStats) return null;
 
-  // Activity color mapping
+  // Activity color mapping (updated for Pose-Temporal detector)
   const activityColors = {
+    // Stationary
+    'sitting': 'bg-yellow-500',
+    'reading': 'bg-orange-500',
+    'reading_standing': 'bg-amber-600',
     'standing': 'bg-green-500',
+
+    // Movement
+    'walking_slow': 'bg-cyan-400',
     'walking': 'bg-blue-500',
-    'walking_slow': 'bg-cyan-500',
-    'running': 'bg-red-500',
-    'sitting/crouching': 'bg-yellow-500',
-    'loitering': 'bg-orange-500',
-    'erratic_movement': 'bg-purple-500',
-    'potential_fall': 'bg-white',
+    'walking_fast': 'bg-blue-700',
+    'jogging': 'bg-indigo-600',
+    'running': 'bg-red-600',
+
+    // Meta states
+    'initializing': 'bg-gray-300',
+    'no_pose': 'bg-gray-400',
     'unknown': 'bg-gray-500'
   };
 
@@ -90,25 +122,36 @@ export default function ActivityAnalytics({ csvData, fileName }) {
         <p className="text-sm text-gray-600">
           Analyzing {fileName || 'activity data'}
         </p>
+        <div className="mt-2 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+          <p className="text-xs text-blue-800">
+            <strong>Pose-Temporal Detector:</strong> Using YOLOv8-Pose keypoints + temporal velocity analysis for accurate activity classification
+          </p>
+        </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg">
           <h3 className="text-sm font-semibold text-blue-800 mb-1">
-            Total Detections
+            Total People Tracked
           </h3>
           <p className="text-3xl font-bold text-blue-600">
-            {activityStats.totalDetections.toLocaleString()}
+            {activityStats.totalDetections}
+          </p>
+          <p className="text-xs text-blue-700 mt-1">
+            Unique IDs detected
           </p>
         </div>
 
         <div className="bg-green-50 p-4 rounded-lg">
           <h3 className="text-sm font-semibold text-green-800 mb-1">
-            Unique People
+            Avg Confidence
           </h3>
           <p className="text-3xl font-bold text-green-600">
-            {activityStats.uniquePeople}
+            {activityStats.avgConfidencePercent}%
+          </p>
+          <p className="text-xs text-green-700 mt-1">
+            Detection accuracy
           </p>
         </div>
 
@@ -118,6 +161,9 @@ export default function ActivityAnalytics({ csvData, fileName }) {
           </h3>
           <p className="text-3xl font-bold text-purple-600">
             {activityStats.uniqueActivities}
+          </p>
+          <p className="text-xs text-purple-700 mt-1">
+            Distinct activities
           </p>
         </div>
       </div>
@@ -150,64 +196,13 @@ export default function ActivityAnalytics({ csvData, fileName }) {
                   </div>
                 </div>
               </div>
-              <div className="w-20 text-right">
+              <div className="w-16 text-right">
                 <span className="text-sm font-semibold text-gray-700">
-                  {count.toLocaleString()}
+                  {percentage}%
                 </span>
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Activity by Person */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-          Activity by Person
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Person ID
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Primary Activity
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Total Frames
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {Object.entries(activityStats.activityByPerson).map(([personId, activities]) => {
-                const totalFrames = Object.values(activities).reduce((sum, count) => sum + count, 0);
-                const primaryActivity = Object.entries(activities)
-                  .sort((a, b) => b[1] - a[1])[0];
-
-                return (
-                  <tr key={personId} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
-                      #{personId}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                      <span className="flex items-center">
-                        <div className={`w-3 h-3 rounded mr-2 ${getActivityColor(primaryActivity[0])}`}></div>
-                        <span className="capitalize">{primaryActivity[0].replace('_', ' ')}</span>
-                        <span className="ml-2 text-gray-500">
-                          ({((primaryActivity[1] / totalFrames) * 100).toFixed(0)}%)
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
-                      {totalFrames}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       </div>
 

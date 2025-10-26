@@ -14,6 +14,7 @@ import ActivityAnalytics from "./components/ActivityAnalytics";
 import TimelineChart from "./components/TimelineChart";
 import Charts from "./components/Charts";
 import EnhancedCharts from "./components/EnhancedCharts";
+import SimpleSummary from "./components/SimpleSummary";
 
 export default function Home() {
   const [csvData, setCsvData] = useState([]);
@@ -23,6 +24,7 @@ export default function Home() {
   const [zones, setZones] = useState([]);
   const [videoSize, setVideoSize] = useState(null);
   const [processingResult, setProcessingResult] = useState(null);
+  const [showInDepthData, setShowInDepthData] = useState(false);
 
   const handleDataLoad = (data, fileName) => {
     setCsvData(data);
@@ -163,71 +165,105 @@ export default function Home() {
             </section>
           )}
 
-          {/* Timeline Chart - Show for any data with zones */}
-          {csvData.length > 0 && csvData[0]?.zone_id !== undefined && (
-            <section>
-              <TimelineChart csvData={csvData} fileName={csvFileName} />
-            </section>
-          )}
-
-          {/* Activity Analytics - Show for activity detection data */}
-          {csvData.length > 0 && csvData[0]?.activity && (
-            <section>
-              <ActivityAnalytics csvData={csvData} fileName={csvFileName} />
-            </section>
-          )}
-
-          {/* Zone Analytics - Show for zone tracking data */}
-          {csvData.length > 0 &&
-            csvFileName.includes("analytics") &&
-            !csvData[0]?.activity && (
-              <section>
-                <ZoneAnalytics csvData={csvData} fileName={csvFileName} />
-              </section>
-            )}
-
-          {/* Enhanced Statistics Section */}
+          {/* Simple Summary - Always show first when data is available */}
           {csvData.length > 0 && (
             <section>
-              <EnhancedStatistics data={csvData} fileName={csvFileName} />
+              <SimpleSummary csvData={csvData} fileName={csvFileName} zones={zones} />
             </section>
           )}
 
-          {/* Original Statistics Section (for comparison) */}
+          {/* Toggle for In-Depth Data */}
           {csvData.length > 0 && (
-            <section>
-              <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                <h3 className="text-sm font-medium text-gray-700">
-                  📈 Raw Data Statistics (Before Deduplication)
-                </h3>
-                <p className="text-xs text-gray-600">
-                  Shows statistics from the original data without processing
-                </p>
-              </div>
-              <Statistics data={csvData} fileName={csvFileName} />
+            <section className="text-center">
+              <button
+                onClick={() => setShowInDepthData(!showInDepthData)}
+                className="inline-flex items-center space-x-3 px-6 py-3 bg-white border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors shadow-md"
+              >
+                <span className="text-lg font-semibold">
+                  {showInDepthData ? '📊 Hide' : '📈 Show'} More In-Depth Data
+                </span>
+                <svg
+                  className={`w-5 h-5 transition-transform ${showInDepthData ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </section>
           )}
 
-          {/* Enhanced Charts Section */}
-          {csvData.length > 0 && (
-            <section>
-              <EnhancedCharts data={csvData} fileName={csvFileName} />
-            </section>
-          )}
+          {/* All advanced analytics - Only show when toggle is ON */}
+          {showInDepthData && (
+            <>
+              {/* Timeline Chart - Show for any data with zones */}
+              {csvData.length > 0 && csvData[0]?.zone_id !== undefined && (
+                <section>
+                  <TimelineChart csvData={csvData} fileName={csvFileName} />
+                </section>
+              )}
 
-          {/* Original Charts Section (for comparison) */}
-          {csvData.length > 0 && (
-            <section>
-              <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                <h3 className="text-sm font-medium text-gray-700">
-                  📊 Raw Data Visualizations (Before Processing)
-                </h3>
-                <p className="text-xs text-gray-600">
-                  Shows charts from the original data without deduplication
-                </p>
-              </div>
-              <Charts data={csvData} fileName={csvFileName} />
-            </section>
+              {/* Activity Analytics - Show for activity detection data */}
+              {csvData.length > 0 && csvData[0]?.activity && (
+                <section>
+                  <ActivityAnalytics csvData={csvData} fileName={csvFileName} />
+                </section>
+              )}
+
+              {/* Zone Analytics - Show for zone tracking data */}
+              {csvData.length > 0 &&
+                csvFileName.includes("analytics") &&
+                !csvData[0]?.activity && (
+                  <section>
+                    <ZoneAnalytics csvData={csvData} fileName={csvFileName} />
+                  </section>
+                )}
+
+              {/* Enhanced Statistics Section */}
+              {csvData.length > 0 && (
+                <section>
+                  <EnhancedStatistics data={csvData} fileName={csvFileName} />
+                </section>
+              )}
+
+              {/* Original Statistics Section (for comparison) */}
+              {csvData.length > 0 && (
+                <section>
+                  <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                    <h3 className="text-sm font-medium text-gray-700">
+                      📈 Raw Data Statistics (Before Deduplication)
+                    </h3>
+                    <p className="text-xs text-gray-600">
+                      Shows statistics from the original data without processing
+                    </p>
+                  </div>
+                  <Statistics data={csvData} fileName={csvFileName} />
+                </section>
+              )}
+
+              {/* Enhanced Charts Section */}
+              {csvData.length > 0 && (
+                <section>
+                  <EnhancedCharts data={csvData} fileName={csvFileName} />
+                </section>
+              )}
+
+              {/* Original Charts Section (for comparison) */}
+              {csvData.length > 0 && (
+                <section>
+                  <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                    <h3 className="text-sm font-medium text-gray-700">
+                      📊 Raw Data Visualizations (Before Processing)
+                    </h3>
+                    <p className="text-xs text-gray-600">
+                      Shows charts from the original data without deduplication
+                    </p>
+                  </div>
+                  <Charts data={csvData} fileName={csvFileName} />
+                </section>
+              )}
+            </>
           )}
 
           {/* Summary Section */}
