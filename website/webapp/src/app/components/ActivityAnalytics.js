@@ -96,12 +96,8 @@ export default function ActivityAnalytics({ csvData, fileName }) {
     'reading_standing': 'bg-amber-600',
     'standing': 'bg-green-500',
 
-    // Movement
-    'walking_slow': 'bg-cyan-400',
+    // Movement (all movement classified as walking)
     'walking': 'bg-blue-500',
-    'walking_fast': 'bg-blue-700',
-    'jogging': 'bg-indigo-600',
-    'running': 'bg-red-600',
 
     // Meta states
     'initializing': 'bg-gray-300',
@@ -213,28 +209,24 @@ export default function ActivityAnalytics({ csvData, fileName }) {
             Activity by Zone
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(activityStats.activityByZone).map(([zoneId, activities]) => {
-              const totalInZone = Object.values(activities).reduce((sum, count) => sum + count, 0);
+            {Object.entries(activityStats.zoneActivityPercentages).map(([zoneId, activities]) => {
               const sortedZoneActivities = Object.entries(activities)
-                .sort((a, b) => b[1] - a[1]);
+                .sort((a, b) => parseFloat(b[1].percentage) - parseFloat(a[1].percentage));
 
               return (
                 <div key={zoneId} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <h4 className="font-semibold text-gray-800 mb-2">
                     Zone {zoneId}
                   </h4>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {totalInZone} detections
-                  </p>
                   <div className="space-y-2">
-                    {sortedZoneActivities.slice(0, 3).map(([activity, count]) => (
+                    {sortedZoneActivities.slice(0, 3).map(([activity, data]) => (
                       <div key={activity} className="flex items-center justify-between text-sm">
                         <span className="flex items-center">
                           <div className={`w-3 h-3 rounded mr-2 ${getActivityColor(activity)}`}></div>
                           <span className="capitalize">{activity.replace('_', ' ')}</span>
                         </span>
                         <span className="font-semibold text-gray-700">
-                          {count}
+                          {data.percentage}%
                         </span>
                       </div>
                     ))}

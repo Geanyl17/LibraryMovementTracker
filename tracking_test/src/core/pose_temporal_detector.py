@@ -43,10 +43,7 @@ class PoseTemporalDetector:
         # Thresholds (calibrated for library CCTV - slow movements)
         # Very conservative to account for perspective (people near camera move more pixels)
         self.standing_speed_threshold = 25.0   # px/sec - minimal movement
-        self.walking_slow_threshold = 100.0    # px/sec - very slow walking
-        self.walking_threshold = 200.0         # px/sec - normal walking
-        self.fast_walking_threshold = 350.0    # px/sec - fast walking
-        self.running_speed_threshold = 700.0   # px/sec - actual running (extremely conservative)
+        self.walking_threshold = 100.0         # px/sec - any walking movement
         self.sitting_hip_angle_max = 120.0     # degrees
         self.reading_head_angle_min = 30.0     # degrees
 
@@ -202,22 +199,15 @@ class PoseTemporalDetector:
             else:
                 activity = "sitting"
         else:
-            # Standing/moving - more granular speed classification
+            # Standing/moving - simplified classification (all movement = walking)
             if velocity < self.standing_speed_threshold:
                 if head_tilt > self.reading_head_angle_min:
                     activity = "reading_standing"
                 else:
                     activity = "standing"
-            elif velocity < self.walking_slow_threshold:
-                activity = "walking_slow"
-            elif velocity < self.walking_threshold:
-                activity = "walking"
-            elif velocity < self.fast_walking_threshold:
-                activity = "walking_fast"
-            elif velocity < self.running_speed_threshold:
-                activity = "jogging"
             else:
-                activity = "running"
+                # Treat all movement as walking (no jogging/running classification)
+                activity = "walking"
 
         # Store in history
         self.activity_history[person_id].append(activity)
